@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Training data, outputs, and experiment logs
+datasets/
+runs/
+wandb/
+mlruns/
+*.cache
+*.log
+
+# Model weights and exported artifacts
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.torchscript
+*.tflite
+*.mlmodel
+
+# Build artifacts
+build/
+dist/

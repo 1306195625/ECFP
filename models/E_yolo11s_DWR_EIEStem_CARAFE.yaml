@@ -1,0 +1,53 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# 消融实验: EIEStem + C3k2_DWR + CARAFE上采样
+# EIEStem: 边缘信息增强Stem，Sobel边缘+MaxPool双分支，总下采样4x
+# CARAFE: Content-Aware ReAssembly of FEatures 内容感知上采样
+# 对X光安检中违禁品边缘特征提取有针对性增强，同时提升特征融合质量
+
+# Parameters
+nc: 80 # number of classes
+scales:
+  # [depth, width, max_channels]
+  n: [0.50, 0.25, 1024]
+  s: [0.50, 0.50, 1024]
+  m: [0.50, 1.00, 512]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.50, 512]
+
+# Backbone
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, EIEStem, [64, 128]] # 0-P2/4 (替换原layer0+1，Sobel边缘增强，总下采样4x，输出128ch)
+  - [-1, 2, C3k2_DWR, [256, False, 0.25]] # 1
+  - [-1, 1, Conv, [256, 3, 2]] # 2-P3/8
+  - [-1, 2, C3k2_DWR, [512, False, 0.25]] # 3
+  - [-1, 1, Conv, [512, 3, 2]] # 4-P4/16
+  - [-1, 2, C3k2_DWR, [512, True]] # 5
+  - [-1, 1, Conv, [1024, 3, 2]] # 6-P5/32
+  - [-1, 2, C3k2_DWR, [1024, True]] # 7
+  - [-1, 1, SPPF, [1024, 5]] # 8
+  - [-1, 2, C2PSA, [1024]] # 9
+
+# Head
+head:
+  # P5 -> P4 上采样路径
+  - [-1, 1, CARAFE, []] # 10 ⭐CARAFE上采样(默认参数: k_enc=3, k_up=5, c_mid=64, scale=2)
+  - [[-1, 5], 1, Concat, [1]] # cat backbone P4
+  - [-1, 2, C3k2, [512, False]] # 12
+
+  # P4 -> P3 上采样路径
+  - [-1, 1, CARAFE, []] # 13 ⭐CARAFE上采样(默认参数: k_enc=3, k_up=5, c_mid=64, scale=2)
+  - [[-1, 3], 1, Concat, [1]] # cat backbone P3
+  - [-1, 2, C3k2, [256, False]] # 15 (P3/8-small)
+
+  # P3 -> P4 下采样路径
+  - [-1, 1, Conv, [256, 3, 2]]
+  - [[-1, 12], 1, Concat, [1]] # cat head P4
+  - [-1, 2, C3k2, [512, False]] # 18 (P4/16-medium)
+
+  # P4 -> P5 下采样路径
+  - [-1, 1, Conv, [512, 3, 2]]
+  - [[-1, 9], 1, Concat, [1]] # cat head P5
+  - [-1, 2, C3k2, [1024, True]] # 21 (P5/32-large)
+
+  - [[15, 18, 21], 1, Detect, [nc]] # Detect(P3, P4, P5)
